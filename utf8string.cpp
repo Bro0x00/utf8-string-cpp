@@ -10,7 +10,7 @@ using namespace utf8;
 	header bytes starting with 11110 will be head 4 byte long characters. 11110 (27) will map to 4.
 	if a byte starts with 11111, it is invalid utf8, it will map to 0
 */
-const uint8_t[32] String::headermap {
+uint8_t String::headermap[32] {
 	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 	0, 0, 0, 0, 0, 0, 0, 0,
 	2, 2, 2, 2,
@@ -19,7 +19,7 @@ const uint8_t[32] String::headermap {
 	0
 };
 
-const uint8_t[32] String::headermap_size {
+uint8_t String::headermap_size[32] {
 	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 	1, 1, 1, 1, 1, 1, 1, 1,
 	2, 2, 2, 2,
@@ -37,11 +37,13 @@ String::iterator& String::iterator::operator++() {
 String::iterator String::iterator::operator++(int) {
 	iterator temp = *this;
 	pos += size;
-	size = string::charactersize(*pos);
+	size = String::headermap_size[*pos];
 	return temp;
 }
 
 String::iterator& String::iterator::operator--() {
+	if(pos <= start)
+		return *this;
 	do {
 		--pos;
 	} while(!isHeader(*pos));
@@ -51,6 +53,8 @@ String::iterator& String::iterator::operator--() {
 
 String::iterator String::iterator::operator--(int) {
 	iterator temp = *this;
+	if(pos <= start)
+		return *this;
 	do {
 		--pos;
 	} while(!isHeader(*pos));
@@ -74,7 +78,178 @@ String::String(const std::string& cppstr) : length { cppstr.length() }, capacity
 	str = (uint8_t*)malloc(length);
 	if(str == nullptr)
 		throw std::bad_alloc();
-	memcpy(str, cstr, length);
+	memcpy(str, cppstr.data(), length);
 }
 
+String::~String() {
+	if(str != nullptr)
+		free(str);
+}
 
+bool String::reserve(unsigned n) {
+	void* temp = calloc(capacity + n, 1);
+	if(temp == nullptr)
+		return false;
+	memcpy(temp, str, length);
+	free(str);
+	capacity += n;
+	str = (uint8_t*)temp;
+	return true;
+}
+
+void String::clear() {
+	length = 0;
+	capacity = 0;
+	if(str != nullptr) {
+		free(str);
+		str = nullptr;
+	}
+}
+
+void String::shrink_to_fit() {
+	if(capacity > length)
+		realloc(str, length);
+	capacity = length;
+}
+
+String::utfchar_t String::back() {
+	if(length == 0)
+		return utfchar_t(0, nullptr);
+	iterator i(str + length, str);
+	return *(--i);
+}
+
+String& String::append(const char* cstr) {
+	size_t len = strlen(cstr);
+	if(capacity < len + length) {
+		void* temp;
+		temp = malloc(len + length);
+		memcpy(temp, str, length);
+		memcpy((uint8_t*)temp + length, cstr, len);
+		length += len;
+		capacity = length;
+		free(str);
+		str = (uint8_t*)temp;
+	}
+	else {
+		memcpy(str + length, cstr, len);
+		length += len;
+		capacity -= len;
+	}
+	return *this;
+}
+
+String& String::append(const char* cstr, unsigned len) {
+	if(capacity < len + length) {
+		void* temp;
+		temp = malloc(len + length);
+		memcpy(temp, str, length);
+		memcpy((uint8_t*)temp + length, cstr, len);
+		length += len;
+		capacity = length;
+		free(str);
+		str = (uint8_t*)temp;
+	}
+	else {
+		memcpy(str + length, cstr, len);
+		length += len;
+		capacity -= len;
+	}
+	return *this;
+}
+
+String& String::append(const std::string& cppstr) {
+	unsigned len = cppstr.length();
+	if(capacity < len + length) {
+		void* temp;
+		temp = malloc(len + length);
+		memcpy(temp, str, length);
+		memcpy((uint8_t*)temp + length, cppstr.data(), len);
+		length += len;
+		capacity = length;
+		free(str);
+		str = (uint8_t*)temp;
+	}
+	else {
+		memcpy(str + length, cppstr.data(), len);
+		length += len;
+		capacity -= len;
+	}
+	return *this;
+}
+
+String& String::append(const String& str) {
+	unsigned len = str.length;
+	if(capacity < len + length) {
+		void* temp;
+		temp = malloc(len + length);
+		memcpy(temp, this->str, length);
+		memcpy((uint8_t*)temp + length, str.str, len);
+		length += len;
+		capacity = length;
+		free(this->str);
+		this->str = (uint8_t*)temp;
+	}
+	else {
+		memcpy(this->str + length, str.str, len);
+		length += len;
+		capacity -= len;
+	}
+	return *this;
+}
+
+String& String::push_back(utfchar_t c) {
+	if(capacity >= length + c.first) {
+		memcpy(str + length, &(c.second->i8), c.first);
+		capacity -= c.first;
+		length += c.first;
+		return *this;
+	}
+	void* temp = malloc(length + c.first);
+	memcpy(temp, str, length);
+	memcpy((uint8_t*)temp + length, &(c.second->i8), c.first);
+	free(str);
+	length += c.first;
+	str = (uint8_t*)temp;
+	capacity = length;
+}
+
+String& String::insert(iterator i, const char* cstr, size_t len) {
+	if(capacity < length + len) {
+		register size_t halflen1 = i.getPos() - str;
+		register size_t halflen2 = ((str + length) - (i.getPos() + len);
+		void* temp = malloc(length + len);
+		memcpy(temp, str, halflen1);
+		memcpy(temp + halflen1, cstr, len);
+		memcpy(temp + halflen1 + len, str + halflen1, halflen2);
+		free(str);
+		str = (uint8_t*)temp;
+		length += len;
+		capacity += len;
+		return *this;
+	}
+	memcpy(i.getPos() + len, i.getPos(), (str + length) - i.getPos());
+	memcpy(i.getPos(), cstr, len);
+	length += len;
+	return *this;
+}
+
+String& String::erase(iterator i) {
+	register size_t len = str + length - (i.pos + headermap_size[*i.pos]);
+	memcpy(i.getPos(), i.getPos() + i.getSize(), len);
+	length -= headermap_size[*i.getPos()];
+	return *this;
+}
+
+String& String::pop_back() {
+	iterator i = end();
+	--i;
+	length -= i.getPos();
+	return *this;
+}
+
+String& String::swap(String& other) {
+	std::swap(length, other.length);
+	std::swap(capacity, other.capacity);
+	std::swap(str, other.str);
+}

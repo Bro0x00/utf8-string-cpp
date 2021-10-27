@@ -5,19 +5,30 @@
 #include <cstdint>
 #include <utility>
 #include <stdexcept>
+#include <iostream>
 
 namespace utf8 {
 	class String {
+		private:
+		static uint8_t headermap[32]; //maps first five bits of a character to its header status (is it a header? if so, how big is the character)
+		static uint8_t headermap_size[32]; //same as headermap, but continuation headers map to 1 (10xxx)
+
+		uint8_t* str;
+		unsigned length;
+		unsigned capacity;
+
 		public:
 		union Character {
 			uint8_t i8;
-			uint8_t[2] i16;
-			uint8_t[3] i24;
-			uint8_t[4] i32;
+			uint8_t i16[2];
+			uint8_t i24[3];
+			uint8_t i32[4];
 		};
 		class iterator {
+			friend class String;
 			public:
-			iterator(uint8_t* pos) : pos { pos }, size { String::characterSize(*pos) } {}
+			iterator(uint8_t* pos, uint8_t* start) : pos { pos }, size { String::characterSize(*pos) },
+			start { start } {}
 			inline uint8_t* getPos() const { return pos; }
 			inline uint8_t getSize() const { return size; }
 			inline void setPos(void* new_pos) { 
@@ -33,11 +44,12 @@ namespace utf8 {
 
 			//first value is size of character
 			inline std::pair<uint8_t, String::Character*> operator*() {
-				return std::pair<uint8_t, String::Character&>(size, (String::Character*)pos);
+				return std::pair<uint8_t, String::Character*>(size, (String::Character*)pos);
 			}
 
 			private:
 			uint8_t* pos;
+			uint8_t* start;
 			uint8_t size;
 		};
 		using utfchar_t = std::pair<uint8_t, Character*>; //first element is size in bytes
@@ -59,43 +71,58 @@ namespace utf8 {
 
 		~String();
 
-		iterator begin() { return iterator(str); }
-		iterator end() { return iterator(str + length); }
+		iterator begin() { return iterator(str, str); }
+		iterator end() { return iterator(str + length, str); }
 		const uint8_t* cdata() const { return str; }
 		uint8_t* data() { return str; }
 		
-		unsigned length() const { return length; }
-		unsigned size() const { return length; }
-		unsigned capacity() const { return capacity; }
-		bool empty() const { return size == 0; }
+		unsigned getLength() const { return length; }
+		unsigned getSize() const { return length; }
+		unsigned getCapacity() const { return capacity; }
+		bool empty() const { return length == 0; }
 
 		bool reserve(unsigned n); //returns 1 if able to reserve, else 0
 		void clear();
 		void shrink_to_fit();
 
-		utfchar_t front() { return utfchar_t(characterSize[*str], str); }
+		utfchar_t front() { return utfchar_t(headermap_size[*str], (Character*)str); }
 		utfchar_t back(); 
 
 		String& append(const char*);
+		String& append(const char*, unsigned);
 		String& append(const std::string&);
 		String& append(const String&);
 		String& push_back(utfchar_t);
 
-		String& insert(iterator, utfchar_t);
-		String& insert(iterator, const char*);
-		String& insert(iterator, const std::string);
-		String& insert(iterator, const String&);
+		//inserts before iterator. NOTE: iterator must be a valid iterator, otherwise, undefined
+		String& insert(iterator, const char*, size_t);
+		inline String& insert(iterator i, utfchar_t c) {
+			insert(i, (char*)&(c.second->i8), c.first);
+			return *this;
+		}
+		inline String& insert(iterator i, const char* cstr)  {
+			size_t len = strlen(cstr);
+			insert(i, cstr, len);
+			return *this;
+		}
+		inline String& insert(iterator i, const std::string cppstr) {
+			insert(i, cppstr.data(), cppstr.length());
+			return *this;
+		}
+		inline String& String::insert(iterator i, const String& utf8str) {
+			insert(i, (char*)utf8str.str, utf8str.length);
+			return *this;
+		}
 
+		//NOTE: the following functions decrease length, but not capacity
 		String& erase(iterator);
 		String& pop_back();
 
 		String& swap(String& other);
+	};
+}
 
-		private:
-		static const uint8_t[32] headermap; //maps first five bits of a character to its header status (is it a header? if so, how big is the character)
-		static const uint8_t[32] headermap_size; //same as headermap, but continuation headers map to 1 (10xxx)
-
-		uint8_t* str;
-		unsigned length;
-		unsigned capacity;
-	}
+inline std::ostream& operator<<(std::ostream& os, const utf8::String& s) {
+	os.write((const char*)s.cdata(), s.getSize());
+	return os;
+}
