@@ -14,8 +14,8 @@ namespace utf8 {
 		static uint8_t headermap_size[32]; //same as headermap, but continuation headers map to 1 (10xxx)
 
 		uint8_t* str;
-		unsigned length;
-		unsigned capacity;
+		size_t length;
+		size_t capacity;
 
 		public:
 		union Character {
@@ -109,7 +109,7 @@ namespace utf8 {
 			insert(i, cppstr.data(), cppstr.length());
 			return *this;
 		}
-		inline String& String::insert(iterator i, const String& utf8str) {
+		inline String& insert(iterator i, const String& utf8str) {
 			insert(i, (char*)utf8str.str, utf8str.length);
 			return *this;
 		}

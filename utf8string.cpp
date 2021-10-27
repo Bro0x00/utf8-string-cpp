@@ -62,7 +62,7 @@ String::iterator String::iterator::operator--(int) {
 	return temp;
 }
 
-String::String(String&& rval) : str { rval.str }, length { rval.length }, capacity { rval.capacity } {
+String::String(String&& rval) noexcept : str { rval.str }, length { rval.length }, capacity { rval.capacity } {
 	rval.str = nullptr;
 }
 
@@ -108,7 +108,7 @@ void String::clear() {
 
 void String::shrink_to_fit() {
 	if(capacity > length)
-		realloc(str, length);
+		str = (uint8_t*)realloc(str, length);
 	capacity = length;
 }
 
@@ -216,12 +216,12 @@ String& String::push_back(utfchar_t c) {
 
 String& String::insert(iterator i, const char* cstr, size_t len) {
 	if(capacity < length + len) {
-		register size_t halflen1 = i.getPos() - str;
-		register size_t halflen2 = ((str + length) - (i.getPos() + len);
+		size_t halflen1 = i.getPos() - str;
+		size_t halflen2 = ((str + length) - (i.getPos() + len));
 		void* temp = malloc(length + len);
 		memcpy(temp, str, halflen1);
-		memcpy(temp + halflen1, cstr, len);
-		memcpy(temp + halflen1 + len, str + halflen1, halflen2);
+		memcpy((uint8_t*)temp + halflen1, cstr, len);
+		memcpy((uint8_t*)temp + halflen1 + len, str + halflen1, halflen2);
 		free(str);
 		str = (uint8_t*)temp;
 		length += len;
@@ -235,7 +235,7 @@ String& String::insert(iterator i, const char* cstr, size_t len) {
 }
 
 String& String::erase(iterator i) {
-	register size_t len = str + length - (i.pos + headermap_size[*i.pos]);
+	size_t len = str + length - (i.pos + headermap_size[*i.pos]);
 	memcpy(i.getPos(), i.getPos() + i.getSize(), len);
 	length -= headermap_size[*i.getPos()];
 	return *this;
@@ -244,7 +244,7 @@ String& String::erase(iterator i) {
 String& String::pop_back() {
 	iterator i = end();
 	--i;
-	length -= i.getPos();
+	length -= i.getSize();
 	return *this;
 }
 
