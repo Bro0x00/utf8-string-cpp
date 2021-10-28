@@ -71,6 +71,18 @@ namespace utf8 {
 
 		~String();
 
+		String& operator=(std::pair<const char*, size_t>);
+		inline String& operator=(const char* cstr) {
+			return *this = std::pair<const char*, size_t>(cstr, strlen(cstr));
+		}
+		inline String& operator=(const std::string& cppstr) {
+			return *this = std::pair<const char*, size_t>(cppstr.data(), cppstr.length());
+		}
+		inline String& operator=(const String& utf8str) {
+			return *this = std::pair<const char*, size_t>((char*)utf8str.str, utf8str.length);
+		}
+		String& operator=(String&& other) noexcept;
+
 		iterator begin() { return iterator(str, str); }
 		iterator end() { return iterator(str + length, str); }
 		const uint8_t* cdata() const { return str; }
@@ -93,25 +105,25 @@ namespace utf8 {
 		String& append(const std::string&);
 		String& append(const String&);
 		String& push_back(utfchar_t);
+		String& push_back(uint8_t size, uint8_t character) {
+			return push_back(utfchar_t(size, (Character*)&character));
+		}
+		String& push_back(char);
 
 		//inserts before iterator. NOTE: iterator must be a valid iterator, otherwise, undefined
 		String& insert(iterator, const char*, size_t);
 		inline String& insert(iterator i, utfchar_t c) {
-			insert(i, (char*)&(c.second->i8), c.first);
-			return *this;
+			return insert(i, (char*)&(c.second->i8), c.first);
 		}
 		inline String& insert(iterator i, const char* cstr)  {
 			size_t len = strlen(cstr);
-			insert(i, cstr, len);
-			return *this;
+			return insert(i, cstr, len);
 		}
 		inline String& insert(iterator i, const std::string cppstr) {
-			insert(i, cppstr.data(), cppstr.length());
-			return *this;
+			return insert(i, cppstr.data(), cppstr.length());
 		}
 		inline String& insert(iterator i, const String& utf8str) {
-			insert(i, (char*)utf8str.str, utf8str.length);
-			return *this;
+			return insert(i, (char*)utf8str.str, utf8str.length);
 		}
 
 		//NOTE: the following functions decrease length, but not capacity

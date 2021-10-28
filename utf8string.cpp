@@ -86,6 +86,28 @@ String::~String() {
 		free(str);
 }
 
+String& String::operator=(std::pair<const char*, size_t> buffer) {
+	if(capacity < buffer.second) {
+		if(str)
+			free(str);
+		str = (uint8_t*)malloc(buffer.second);
+		memcpy(str, buffer.first, buffer.second);
+		capacity = length = buffer.second;
+		return *this;
+	}
+	length = buffer.second;
+	memcpy(str, buffer.first, length);
+	return *this;
+}
+
+String& String::operator=(String&& other) noexcept {
+	str = other.str;
+	length = other.length;
+	capacity = other.length;
+	other.str = nullptr;
+	return *this;
+}
+
 bool String::reserve(unsigned n) {
 	void* temp = calloc(capacity + n, 1);
 	if(temp == nullptr)
@@ -98,6 +120,7 @@ bool String::reserve(unsigned n) {
 }
 
 void String::clear() {
+	//printf("Tank was here")
 	length = 0;
 	capacity = 0;
 	if(str != nullptr) {
@@ -212,6 +235,22 @@ String& String::push_back(utfchar_t c) {
 	length += c.first;
 	str = (uint8_t*)temp;
 	capacity = length;
+	return *this;
+}
+String& String::push_back(char c) {
+	if(capacity > length) {
+		str[length] = c;
+		length++;
+		return *this;
+	}
+	uint8_t* temp = (uint8_t*)malloc(length + 1);
+	memcpy(temp, str, length);
+	temp[length] = c;
+	free(str);
+	str = temp;
+	++length;
+	++capacity;
+	return *this;
 }
 
 String& String::insert(iterator i, const char* cstr, size_t len) {
@@ -235,9 +274,9 @@ String& String::insert(iterator i, const char* cstr, size_t len) {
 }
 
 String& String::erase(iterator i) {
-	size_t len = str + length - (i.pos + headermap_size[*i.pos]);
+	size_t len = str + length - i.getPos();
 	memcpy(i.getPos(), i.getPos() + i.getSize(), len);
-	length -= headermap_size[*i.getPos()];
+	length -= i.getSize();
 	return *this;
 }
 
@@ -252,4 +291,5 @@ String& String::swap(String& other) {
 	std::swap(length, other.length);
 	std::swap(capacity, other.capacity);
 	std::swap(str, other.str);
+	return *this;
 }
