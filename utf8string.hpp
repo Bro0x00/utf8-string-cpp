@@ -105,7 +105,7 @@ namespace utf8 {
 		String& append(const std::string&);
 		String& append(const String&);
 		String& push_back(utfchar_t);
-		String& push_back(uint8_t size, uint8_t character) {
+		String& push_back(uint8_t size, uint32_t character) {
 			return push_back(utfchar_t(size, (Character*)&character));
 		}
 		String& push_back(char);
