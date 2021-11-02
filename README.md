@@ -56,5 +56,6 @@ Data Types:
 - - insert(iterator, [args]): insert arg at iterator
 - - erase(iterator): erase character at iterator
 - - swap(String&): swap contents
+
 Lone Functions:
 - opterator<<(std::ostream&, utf8::String): insert string to output stream
